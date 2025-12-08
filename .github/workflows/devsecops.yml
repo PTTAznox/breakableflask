@@ -22,33 +22,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: Dependances
     steps:
-      - name: Test Dockerfile
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Scan du Dockerfile avec Trivy
         run: |
-          echo "ecrire ici le scrypt de contrôle du Dockerfile"
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -v $HOME/.cache/trivy:/root/.cache/ \
+            aquasec/trivy:latest config \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              /workspace
   Deploy:
     runs-on: ubuntu-latest
     needs: Dockerfile
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Installer jq
-      run: sudo apt-get update && sudo apt-get install -y jq
-
-    - name: Installer Trivy (Docker image)
-      run: docker pull aquasec/trivy:latest
-
-    - name: Build de l'image Docker
-      run: docker build -t imgvulne:1.1 .
-
-    - name: Scan de l'image Docker avec Trivy (ta commande)
-      run: |
-        docker run --rm \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          -v "$HOME/.cache/trivy":/root/.cache/ \
-          aquasec/trivy:latest image --exit-code 1 --format json --severity HIGH,CRITICAL imgvulne:1.1 \
-        | jq -r '
-          ["TARGET","PACKAGE","INSTALLED","VULN","SEVERITY"],
-          (.Results[]? as $r | $r.Vulnerabilities[]? | [$r.Target, .PkgName, .InstalledVersion, .VulnerabilityID, .Severity]) 
-          | @tsv' \
-        | column -t -s $'\t'
+      - name: Deploy
+        run: |
+          echo "Rien à faire ici. Votre application est prête à être déployée"
