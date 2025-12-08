@@ -4,26 +4,23 @@ jobs:
   Dependances:
     runs-on: ubuntu-latest
     steps:
-# 1) Récupérer le code du repo
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) Installer Trivy
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget
-          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.56.2_Linux-64bit.deb
-          sudo dpkg -i trivy_0.56.2_Linux-64bit.deb
+      - name: Build de l'image Docker
+        run: docker build -t imgvulne:1.1 .
 
-      # 3) Contrôle des dépendances Python (requirements.txt)
-      - name: Scan des dépendances avec Trivy
+      - name: Scan de l'image Docker avec Trivy
         run: |
-          trivy fs \
-            --security-checks vuln \
-            --severity CRITICAL,HIGH \
-            --exit-code 1 \
-            requirements.txt
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$HOME/.cache/trivy":/root/.cache/ \
+            aquasec/trivy:latest image --exit-code 1 --format json --severity HIGH,CRITICAL imgvulne:1.1 \
+          | jq -r '
+            ["TARGET","PACKAGE","INSTALLED","VULN","SEVERITY"],
+            (.Results[]? as $r | $r.Vulnerabilities[]? | [$r.Target, .PkgName, .InstalledVersion, .VulnerabilityID, .Severity])
+            | @tsv' \
+          | column -t -s $'\t'
             
   Dockerfile:
     runs-on: ubuntu-latest
