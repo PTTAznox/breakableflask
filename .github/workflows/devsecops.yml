@@ -4,23 +4,19 @@ jobs:
   Dependances:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Build de l'image Docker
-        run: docker build -t imgvulne:1.1 .
-
-      - name: Scan de l'image Docker avec Trivy
+      - name: Scan des dépendances avec Trivy (requirements.txt)
         run: |
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$HOME/.cache/trivy":/root/.cache/ \
-            aquasec/trivy:latest image --exit-code 1 --format json --severity HIGH,CRITICAL imgvulne:1.1 \
-          | jq -r '
-            ["TARGET","PACKAGE","INSTALLED","VULN","SEVERITY"],
-            (.Results[]? as $r | $r.Vulnerabilities[]? | [$r.Target, .PkgName, .InstalledVersion, .VulnerabilityID, .Severity])
-            | @tsv' \
-          | column -t -s $'\t'
+            -v ${{ github.workspace }}:/workspace \
+            -v $HOME/.cache/trivy:/root/.cache/ \
+            aquasec/trivy:latest fs \
+              --security-checks vuln \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              /workspace
             
   Dockerfile:
     runs-on: ubuntu-latest
