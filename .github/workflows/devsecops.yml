@@ -1,5 +1,6 @@
 name: Automatisation des tests DevSecOps
 on: push
+
 jobs:
   Dependances:
     runs-on: ubuntu-latest
@@ -7,7 +8,10 @@ jobs:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Scan des dépendances avec Trivy (requirements.txt)
+      - name: Créer le dossier de rapports
+        run: mkdir -p reports
+
+      - name: Scan des dépendances avec Trivy (fs)
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
@@ -15,9 +19,19 @@ jobs:
             aquasec/trivy:latest fs \
               --security-checks vuln \
               --severity HIGH,CRITICAL \
+              --format json \
+              --output /workspace/reports/trivy-dependances.json \
               --exit-code 1 \
               /workspace
-            
+
+      - name: Uploader le rapport Trivy (dépendances)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report-dependances
+          path: reports/trivy-dependances.json
+          if-no-files-found: error
+
   Dockerfile:
     runs-on: ubuntu-latest
     needs: Dependances
@@ -25,15 +39,29 @@ jobs:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Scan du Dockerfile avec Trivy
+      - name: Créer le dossier de rapports
+        run: mkdir -p reports
+
+      - name: Scan du Dockerfile / IaC avec Trivy (config)
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -v $HOME/.cache/trivy:/root/.cache/ \
             aquasec/trivy:latest config \
               --severity HIGH,CRITICAL \
+              --format json \
+              --output /workspace/reports/trivy-dockerfile.json \
               --exit-code 1 \
               /workspace
+
+      - name: Uploader le rapport Trivy (Dockerfile)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report-dockerfile
+          path: reports/trivy-dockerfile.json
+          if-no-files-found: error
+
   Deploy:
     runs-on: ubuntu-latest
     needs: Dockerfile
